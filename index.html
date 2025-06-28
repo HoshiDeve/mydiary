@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diario di Viaggio Interattivo | Giappone (V2)</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    
+    <!-- Mapbox GL JS -->
+    <script src='https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.js'></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.css' rel='stylesheet' />
+    
+    <!-- GSAP per animazioni avanzate -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+
+    <style>
+        /* --- DESIGN REFRESH V2 (Tema Giappone) --- */
+        :root {
+            --font-heading: 'Playfair Display', serif;
+            --font-body: 'Poppins', sans-serif;
+            --color-background: #1a1a1a; /* Nero inchiostro */
+            --color-text: #E5E7EB; /* Grigio chiaro per leggibilità */
+            --color-text-muted: #9CA3AF; /* Grigio per metadati */
+            --color-accent: #D93B3B; /* Rosso vermiglio */
+            --color-accent-dark: #B92B2B;
+            --color-surface: rgba(30, 30, 30, 0.7); /* Superficie semi-trasparente */
+            --timing-fast: 0.4s;
+            --timing-slow: 0.8s;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: var(--font-body);
+            font-weight: 300;
+            color: var(--color-text);
+            background-color: var(--color-background);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* --- MAPPA E STORIA --- */
+        #map {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 50%;
+            height: 100vh;
+            transition: opacity 1s ease;
+        }
+
+        #story {
+            width: 50%;
+            margin-left: 50%;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- HEADER --- */
+        header {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 2rem;
+            position: relative;
+            background: radial-gradient(circle at center, rgba(26, 26, 26, 0.8) 0%, rgba(26, 26, 26, 1) 70%);
+        }
+        header h1 {
+            font-family: var(--font-heading);
+            font-size: clamp(3rem, 7vw, 5rem);
+            margin: 0;
+            color: white;
+            text-shadow: 0 2px 20px rgba(0,0,0,0.5);
+        }
+        header p {
+            font-size: 1.2rem;
+            color: var(--color-text-muted);
+            margin-top: 1rem;
+            max-width: 500px;
+        }
+        .scroll-prompt {
+            position: absolute;
+            bottom: 3rem;
+            color: var(--color-text);
+            opacity: 0;
+            animation: fadeIn 1s 2s forwards, bounce 2s infinite 3s;
+        }
+
+        /* --- CAPITOLI --- */
+        .story-container { padding: 5rem 4rem; }
+        .chapter {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            margin-bottom: 10rem;
+        }
+        .chapter-content {
+            background: var(--color-surface);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 1rem;
+            padding: 2.5rem;
+            max-width: 600px;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+        }
+        .chapter h2 {
+            font-family: var(--font-heading);
+            font-size: 2.8rem;
+            letter-spacing: 0.02em;
+            margin-bottom: 1.5rem;
+            color: white;
+        }
+        .metadata {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem 2rem;
+            font-size: 0.9rem;
+            color: var(--color-text-muted);
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .metadata strong { color: var(--color-text); font-weight: 600; }
+        .chapter p { font-size: 1.1rem; line-height: 1.8; margin-bottom: 2rem; }
+        .chapter-image-container {
+            margin-top: 2rem;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        .chapter-image-container img { width: 100%; height: auto; display: block; }
+        blockquote {
+            border-left: 3px solid var(--color-accent);
+            padding-left: 1.5rem; margin: 2rem 0; font-style: italic;
+            font-size: 1.2rem; color: var(--color-text-muted);
+        }
+        blockquote cite { display: block; margin-top: 1rem; font-style: normal; font-weight: 400; color: var(--color-text); }
+
+        /* --- UI ELEMENTS --- */
+        #progress-bar { position: fixed; top: 0; left: 0; height: 4px; background: linear-gradient(90deg, var(--color-accent), var(--color-accent-dark)); width: 0%; z-index: 1001; }
+        #timeline {
+            position: fixed; bottom: 20px; left: 50%;
+            transform: translateX(-50%); background: var(--color-surface);
+            backdrop-filter: blur(10px); padding: 8px; z-index: 999;
+            display: flex; justify-content: center; gap: 8px;
+            border-radius: 50px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        #timeline a {
+            color: var(--color-text); text-decoration: none; font-weight: 400;
+            font-size: 0.9rem; padding: 10px 20px; border-radius: 30px;
+            transition: all var(--timing-fast) ease;
+        }
+        #timeline a.active-timeline-link {
+            background-color: var(--color-accent); color: white;
+            font-weight: 600; box-shadow: 0 0 20px rgba(217, 59, 59, 0.5);
+        }
+
+        .lang-switcher {
+            position: fixed; top: 1.5rem; right: 1.5rem; z-index: 1000;
+            background: var(--color-surface); backdrop-filter: blur(10px);
+            padding: 0.5rem; border-radius: 50px; display: flex;
+            gap: 0.5rem; border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .lang-switcher button {
+            background: none; border: none; color: var(--color-text-muted);
+            cursor: pointer; font-family: var(--font-body); font-weight: 600;
+            font-size: 0.8rem; padding: 0.5rem 0.8rem; border-radius: 30px;
+            transition: all 0.3s ease;
+        }
+        .lang-switcher button:hover { color: var(--color-text); }
+        .lang-switcher button.active { background-color: var(--color-accent); color: white; }
+
+        .mapboxgl-popup-content {
+            font-family: var(--font-body); padding: 1rem !important;
+            border-radius: 8px !important; box-shadow: 0 5px 25px rgba(0,0,0,0.25);
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            background-color: var(--color-surface) !important;
+            backdrop-filter: blur(5px); min-width: 240px; color: var(--color-text);
+        }
+        .mapboxgl-popup-content h3 { font-family: var(--font-heading); font-size: 1.3rem; margin: 0 0 10px 0; color: var(--color-accent); }
+        .mapboxgl-popup-content p { margin: 0 0 5px 0; font-size: 0.9rem; }
+        .mapboxgl-popup-close-button { color: white; font-size: 1.5rem; padding: 0 5px; }
+
+        footer { padding: 4rem 2rem; text-align: center; color: var(--color-text-muted); font-size: 0.9rem; margin-top: auto; }
+        footer span { display: block; margin-top: 0.5rem; font-size: 0.8rem; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 0.7; } }
+        @keyframes bounce { 0%, 20%, 50%, 80%, 100% { transform: translateY(0); } 40% { transform: translateY(-10px); } 60% { transform: translateY(-5px); } }
+
+        @media (max-width: 900px) {
+            #map { width: 100%; height: 40vh; position: relative; }
+            #story { width: 100%; margin-left: 0; }
+            .story-container { padding: 2rem 1rem; }
+            #timeline { display: none; }
+            .lang-switcher { top: 1rem; right: 1rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="progress-bar"></div>
+    <div id="timeline"></div>
+    <div class="lang-switcher">
+        <button data-lang="it" class="active">IT</button>
+        <button data-lang="en">EN</button>
+        <button data-lang="ja">JA</button>
+    </div>
+    <div id="map"></div>
+
+    <div id="story">
+        <header>
+            <div class="header-content">
+                <h1 data-key="header_title">Diario di Viaggio Interattivo</h1>
+                <p data-key="header_subtitle">Un'esplorazione multimediale attraverso le meraviglie del Giappone.</p>
+            </div>
+            <div class="scroll-prompt">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 5V19M12 19L18 13M12 19L6 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+        </header>
+
+        <div class="story-container">
+            <div id="capitolo-1" class="chapter">
+                <div class="chapter-content">
+                    <h2 data-key="ch1_title">Luci e Anime di Akihabara</h2>
+                    <div class="metadata"><span><strong data-key="date_label">Data:</strong> 26 Marzo 2025</span></div>
+                    <p data-key="ch1_p">Il viaggio ha inizio qui, nel cuore pulsante della cultura pop. Le insegne al neon si riflettono sull'asfalto bagnato, un fiume di persone si muove tra sale giochi e negozi di elettronica. Akihabara è un'esperienza sensoriale travolgente.</p>
+                    <div class="chapter-image-container"><img src="images/capitolo-1.jpg" alt="Vicolo di Akihabara" class="parallax-img"></div>
+                </div>
+            </div>
+            <div id="capitolo-2" class="chapter">
+                <div class="chapter-content">
+                    <h2 data-key="ch2_title">L'Incrocio di Shibuya</h2>
+                     <div class="metadata"><span><strong data-key="date_label">Data:</strong> 26 Marzo 2025</span></div>
+                    <p data-key="ch2_p">Ci si sente al centro del mondo, osservando il flusso ordinato e caotico dell'incrocio più famoso del pianeta. Un balletto di persone, luci e suoni che rappresenta perfettamente l'energia di Tokyo.</p>
+                    <div class="chapter-image-container"><img src="images/capitolo-2.jpg" alt="Incrocio di Shibuya dall'alto" class="parallax-img"></div>
+                </div>
+            </div>
+            <div id="capitolo-3" class="chapter">
+                <div class="chapter-content">
+                    <h2 data-key="ch3_title">Sguardo sulla Metropoli</h2>
+                    <div class="metadata"><span><strong data-key="date_label">Data:</strong> 24 Marzo 2025</span></div>
+                    <p data-key="ch3_p">Dall'alto del Tokyo Skytree, la città si trasforma in un mare infinito di luci. L'orizzonte si perde a vista d'occhio, un promemoria della vastità e della complessità di questa incredibile metropoli.</p>
+                    <div class="chapter-image-container"><img src="images/capitolo-3.jpg" alt="Vista dal Tokyo Skytree" class="parallax-img"></div>
+                </div>
+            </div>
+            <div id="capitolo-4" class="chapter">
+                <div class="chapter-content">
+                    <h2 data-key="ch4_title">La Sacralità del Fuji</h2>
+                     <div class="metadata"><span><strong data-key="date_label">Data:</strong> 20 Marzo 2025</span></div>
+                    <p data-key="ch4_p">Un'icona sacra che si staglia contro il cielo. Vedere il Monte Fuji dalla Pagoda Chureito è un momento di pura serenità, un'immagine che rimane impressa nella memoria e nello spirito.</p>
+                    <div class="chapter-image-container"><img src="images/capitolo-4.jpg" alt="Monte Fuji e Pagoda Chureito" class="parallax-img"></div>
+                </div>
+            </div>
+             <div id="capitolo-5" class="chapter">
+                <div class="chapter-content">
+                    <h2 data-key="ch5_title">Riflessi nel Verde</h2>
+                     <div class="metadata"><span><strong data-key="date_label">Data:</strong> 20 Marzo 2025</span></div>
+                    <p data-key="ch5_p">Una pausa dalla frenesia urbana nel giardino di Shinjuku Gyoen. Qui, tra laghetti e case da tè, la natura offre uno spettacolo di pace e armonia, un rifugio per l'anima nel cuore della città.</p>
+                    <div class="chapter-image-container"><img src="images/capitolo-5.jpg" alt="Giardino giapponese" class="parallax-img"></div>
+                </div>
+            </div>
+             <div id="capitolo-6" class="chapter">
+                <div class="chapter-content">
+                    <h2 data-key="ch6_title">Pace al Santuario Meiji</h2>
+                     <div class="metadata"><span><strong data-key="date_label">Data:</strong> 22 Marzo 2025</span></div>
+                    <p data-key="ch6_p">Attraversando l'imponente torii in legno, si entra in un'altra dimensione. La foresta che circonda il santuario Meiji Jingu isola dal rumore della città, creando un'oasi di spiritualità dedicata all'imperatore Meiji e all'imperatrice Shōken.</p>
+                    <div class="chapter-image-container"><img src="images/capitolo-6.jpg" alt="Santuario Meiji Jingu" class="parallax-img"></div>
+                </div>
+            </div>
+            <div id="capitolo-7" class="chapter">
+                <div class="chapter-content">
+                    <h2 data-key="ch7_title">I Sentieri Rossi di Kyoto</h2>
+                     <div class="metadata"><span><strong data-key="date_label">Data:</strong> 25 Marzo 2025</span></div>
+                    <p data-key="ch7_p">Camminare lungo i sentieri del Fushimi Inari-taisha è come entrare in un sogno. Le migliaia di torii vermigli creano un tunnel ipnotico che si snoda sulla collina, un'esperienza mistica e indimenticabile nell'antica capitale.</p>
+                    <div class="chapter-image-container"><img src="images/capitolo-7.jpg" alt="Sentiero di torii al Fushimi Inari" class="parallax-img"></div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p data-key="footer_text">© 2025 Diario di Viaggio. Sviluppato con passione.</p>
+            <span data-key="photo_credit">Foto di Giuseppe Blancuzzi</span>
+        </footer>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // --- OGGETTO TRADUZIONI ---
+        const translations = {
+            it: {
+                header_title: "Diario di Viaggio Interattivo",
+                header_subtitle: "Un'esplorazione multimediale attraverso le meraviglie del Giappone.",
+                ch1_title: "Luci e Anime di Akihabara",
+                ch1_p: "Il viaggio ha inizio qui, nel cuore pulsante della cultura pop. Le insegne al neon si riflettono sull'asfalto bagnato, un fiume di persone si muove tra sale giochi e negozi di elettronica. Akihabara è un'esperienza sensoriale travolgente.",
+                ch2_title: "L'Incrocio di Shibuya",
+                ch2_p: "Ci si sente al centro del mondo, osservando il flusso ordinato e caotico dell'incrocio più famoso del pianeta. Un balletto di persone, luci e suoni che rappresenta perfettamente l'energia di Tokyo.",
+                ch3_title: "Sguardo sulla Metropoli",
+                ch3_p: "Dall'alto del Tokyo Skytree, la città si trasforma in un mare infinito di luci. L'orizzonte si perde a vista d'occhio, un promemoria della vastità e della complessità di questa incredibile metropoli.",
+                ch4_title: "La Sacralità del Fuji",
+                ch4_p: "Un'icona sacra che si staglia contro il cielo. Vedere il Monte Fuji dalla Pagoda Chureito è un momento di pura serenità, un'immagine che rimane impressa nella memoria e nello spirito.",
+                ch5_title: "Riflessi nel Verde",
+                ch5_p: "Una pausa dalla frenesia urbana nel giardino di Shinjuku Gyoen. Qui, tra laghetti e case da tè, la natura offre uno spettacolo di pace e armonia, un rifugio per l'anima nel cuore della città.",
+                ch6_title: "Pace al Santuario Meiji",
+                ch6_p: "Attraversando l'imponente torii in legno, si entra in un'altra dimensione. La foresta che circonda il santuario Meiji Jingu isola dal rumore della città, creando un'oasi di spiritualità dedicata all'imperatore Meiji e all'imperatrice Shōken.",
+                ch7_title: "I Sentieri Rossi di Kyoto",
+                ch7_p: "Camminare lungo i sentieri del Fushimi Inari-taisha è come entrare in un sogno. Le migliaia di torii vermigli creano un tunnel ipnotico che si snoda sulla collina, un'esperienza mistica e indimenticabile nell'antica capitale.",
+                date_label: "Data:", location_label: "Luogo:",
+                footer_text: "© 2025 Diario di Viaggio. Sviluppato con passione.",
+                photo_credit: "Foto di Giuseppe Blancuzzi"
+            },
+            en: {
+                header_title: "Interactive Travel Diary",
+                header_subtitle: "A multimedia exploration through the wonders of Japan.",
+                ch1_title: "Lights and Souls of Akihabara",
+                ch1_p: "The journey begins here, in the pulsating heart of pop culture. Neon signs reflect on the wet asphalt, a river of people moves between arcades and electronics stores. Akihabara is an overwhelming sensory experience.",
+                ch2_title: "The Shibuya Crossing",
+                ch2_p: "You feel at the center of the world, watching the orderly yet chaotic flow of the planet's most famous intersection. A ballet of people, lights, and sounds that perfectly represents the energy of Tokyo.",
+                ch3_title: "A View over the Metropolis",
+                ch3_p: "From the top of the Tokyo Skytree, the city transforms into an endless sea of lights. The horizon stretches as far as the eye can see, a reminder of the vastness and complexity of this incredible metropolis.",
+                ch4_title: "The Sacredness of Fuji",
+                ch4_p: "A sacred icon standing against the sky. Seeing Mount Fuji from the Chureito Pagoda is a moment of pure serenity, an image that remains etched in memory and spirit.",
+                ch5_title: "Reflections in Green",
+                ch5_p: "A break from the urban frenzy in Shinjuku Gyoen garden. Here, among ponds and tea houses, nature offers a spectacle of peace and harmony, a refuge for the soul in the heart of the city.",
+                ch6_title: "Peace at Meiji Shrine",
+                ch6_p: "Passing through the imposing wooden torii, you enter another dimension. The forest surrounding the Meiji Jingu shrine isolates from the city's noise, creating an oasis of spirituality dedicated to Emperor Meiji and Empress Shōken.",
+                ch7_title: "The Red Trails of Kyoto",
+                ch7_p: "Walking along the paths of Fushimi Inari-taisha is like entering a dream. The thousands of vermilion torii create a hypnotic tunnel that winds up the hill, a mystical and unforgettable experience in the ancient capital.",
+                date_label: "Date:", location_label: "Location:",
+                footer_text: "© 2025 Travel Diary. Developed with passion.",
+                photo_credit: "Photos by Giuseppe Blancuzzi"
+            },
+            ja: {
+                header_title: "インタラクティブな旅行日記",
+                header_subtitle: "日本の驚異を巡るマルチメディア探検。",
+                ch1_title: "秋葉原の光と魂",
+                ch1_p: "旅はここ、ポップカルチャーの脈打つ中心地から始まります。ネオンサインが濡れたアスファルトに反射し、人々の川がゲームセンターや電気店の間を流れます。秋葉原は圧倒的な感覚体験です。",
+                ch2_title: "渋谷の交差点",
+                ch2_p: "地球で最も有名な交差点の整然とした、しかし混沌とした流れを見て、世界の中心にいるように感じます。東京のエネルギーを完璧に表現する人、光、音のバレエです。",
+                ch3_title: "大都市の眺め",
+                ch3_p: "東京スカイツリーの頂上から、街は果てしない光の海に変わります。地平線は目の届く限り広がり、この信じられないほどのメトロポリスの広大さと複雑さを思い出させます。",
+                ch4_title: "富士の神聖さ",
+                ch4_p: "空にそびえ立つ神聖なアイコン。忠霊塔から富士山を見ることは、純粋な静けさの瞬間であり、記憶と精神に刻まれるイメージです。",
+                ch5_title: "緑の中の反射",
+                ch5_p: "新宿御苑での都会の喧騒からの一休み。ここでは、池や茶室の間で、自然が平和と調和の光景を提供し、都会の中心で魂の避難所となります。",
+                ch6_title: "明治神宮の平和",
+                ch6_p: "堂々とした木製の鳥居をくぐると、別の次元に入ります。明治神宮を取り巻く森は、街の騒音から隔離し、明治天皇と昭憲皇太后に捧げられた精神性のオアシスを作り出します。",
+                ch7_title: "京都の赤い小道",
+                ch7_p: "伏見稲荷大社の小道を歩くことは、夢に入るようなものです。数千の朱色の鳥居が丘を曲がりくねって催眠的なトンネルを作り出し、古都での神秘的で忘れられない体験です。",
+                date_label: "日付:", location_label: "場所:",
+                footer_text: "© 2025 旅行日記。情熱を込めて開発されました。",
+                photo_credit: "撮影：ジュゼッペ・ブランクッツィ"
+            }
+        };
+
+        // --- CONFIGURAZIONE MAPPA E CAPITOLI ---
+        mapboxgl.accessToken = 'pk.eyJ1IjoidGVtbG9yYSIsImEiOiJjbWNmZDV4MXYwODFzMmxxdmFkNDBvbjJhIn0.o9QshYtrXr5qOtQUGSX1NA';
+
+        const chapters = {
+            'capitolo-1': { center: [139.775, 35.698], zoom: 15, pitch: 45, luogo: 'Akihabara' },
+            'capitolo-2': { center: [139.700, 35.659], zoom: 16, pitch: 30, luogo: 'Shibuya' },
+            'capitolo-3': { center: [139.810, 35.710], zoom: 13, pitch: 50, luogo: 'Tokyo Skytree' },
+            'capitolo-4': { center: [138.73, 35.36], zoom: 14, pitch: 60, bearing: 20, luogo: 'Monte Fuji' },
+            'capitolo-5': { center: [139.709, 35.685], zoom: 15, pitch: 20, luogo: 'Shinjuku Gyoen' },
+            'capitolo-6': { center: [139.699, 35.676], zoom: 15, pitch: 25, luogo: 'Santuario Meiji' },
+            'capitolo-7': { center: [135.772, 34.967], zoom: 16, pitch: 30, luogo: 'Kyoto' }
+        };
+
+        const map = new mapboxgl.Map({
+            container: 'map', style: 'mapbox://styles/mapbox/dark-v11',
+            center: chapters['capitolo-1'].center, zoom: 10, pitch: 0,
+            projection: 'globe', interactive: false
+        });
+
+        let activeChapterName = '';
+        let currentLang = 'it';
+        const mapMarkers = [];
+
+        // --- FUNZIONI DI TRADUZIONE E SETUP ---
+        function setLanguage(lang) {
+            currentLang = lang;
+            document.documentElement.lang = lang;
+            
+            document.querySelectorAll('[data-key]').forEach(el => {
+                const key = el.dataset.key;
+                if (translations[lang][key]) {
+                    el.innerHTML = translations[lang][key];
+                }
+            });
+
+            updateMapPopups(lang);
+
+            document.querySelectorAll('.lang-switcher button').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.lang === lang);
+            });
+        }
+
+        function updateMapPopups(lang) {
+            mapMarkers.forEach(marker => marker.remove());
+            mapMarkers.length = 0;
+
+            for (const chapterName in chapters) {
+                const chapterKey = chapterName.replace('-', ''); // es. capitolo1
+                const chapterConfig = chapters[chapterName];
+                
+                let popupContent = `<h3>${translations[lang][`${chapterKey}_title`]}</h3>`;
+                if(chapterConfig.luogo) {
+                    popupContent += `<p><strong>${translations[lang]['location_label']}</strong> ${chapterConfig.luogo}</p>`;
+                }
+                
+                const popup = new mapboxgl.Popup({ closeButton: true, offset: 25 }).setHTML(popupContent);
+                const marker = new mapboxgl.Marker({ color: '#D93B3B' })
+                    .setLngLat(chapterConfig.center)
+                    .setPopup(popup)
+                    .addTo(map);
+                mapMarkers.push(marker);
+            }
+        }
+
+        document.querySelectorAll('.lang-switcher button').forEach(button => {
+            button.addEventListener('click', (e) => setLanguage(e.target.dataset.lang));
+        });
+
+        const timelineDiv = document.getElementById('timeline');
+        for (const chapterName in chapters) {
+            const link = document.createElement('a');
+            link.href = '#'; link.id = `link-${chapterName}`;
+            link.textContent = chapterName.split('-')[1]; 
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                document.getElementById(chapterName).scrollIntoView({ behavior: 'smooth' });
+            });
+            timelineDiv.appendChild(link);
+        }
+
+        function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+        function setActiveChapter(chapterName) {
+            if (chapterName === activeChapterName) return;
+            map.flyTo({ ...chapters[chapterName], duration: 4000, easing: easeOutCubic });
+            if (activeChapterName) {
+                document.getElementById(`link-${activeChapterName}`).classList.remove('active-timeline-link');
+            }
+            document.getElementById(`link-${chapterName}`).classList.add('active-timeline-link');
+            activeChapterName = chapterName;
+        }
+
+        map.on('load', () => {
+            map.setFog({ 'color': 'rgb(26, 26, 26)', 'horizon-blend': 0.05 });
+            updateMapPopups(currentLang);
+        });
+
+        // --- ANIMAZIONI CON GSAP ---
+        gsap.registerPlugin(ScrollTrigger);
+        document.querySelectorAll('.chapter').forEach((chapter) => {
+            gsap.from(chapter.querySelector('.chapter-content'), {
+                scrollTrigger: {
+                    trigger: chapter, start: 'top 60%',
+                    end: 'top 30%', toggleActions: 'play none none reverse',
+                },
+                opacity: 0, y: 50, duration: 1, ease: 'power3.out'
+            });
+            
+            const img = chapter.querySelector('.parallax-img');
+            if (img) {
+                gsap.to(img, {
+                    scrollTrigger: {
+                        trigger: chapter, start: 'top bottom',
+                        end: 'bottom top', scrub: true,
+                    },
+                    y: "-20%", ease: 'none'
+                });
+            }
+        });
+        
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) { setActiveChapter(entry.target.id); }
+            });
+        }, { rootMargin: "-50% 0px -50% 0px" });
+        document.querySelectorAll('.chapter').forEach(chapter => observer.observe(chapter));
+
+        const progressBar = document.getElementById('progress-bar');
+        const scrollPrompt = document.querySelector('.scroll-prompt');
+        let promptHidden = false;
+        
+        window.addEventListener('scroll', () => {
+            const scrollableHeight = document.documentElement.scrollHeight - window.innerHeight;
+            const progress = (window.scrollY / scrollableHeight) * 100;
+            progressBar.style.width = `${progress}%`;
+            if (!promptHidden && window.scrollY > 100) {
+                scrollPrompt.style.opacity = '0';
+                promptHidden = true;
+            }
+        });
+
+        setLanguage(currentLang);
+    });
+    </script>
+</body>
+</html>
